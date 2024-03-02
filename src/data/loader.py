@@ -23,6 +23,9 @@ class WaveLoader(DataLoader):
     def load(self) -> torch.DataLoader:
         return None
 
+    def save(self) -> None:
+        pass
+
 
 class SpectrogramLoader(DataLoader):
     def __init__(self, data_path: str, n_fft: int = 400, hop_length: int = 160, n_mels: int = 128):
@@ -33,4 +36,7 @@ class SpectrogramLoader(DataLoader):
 
     def load(self) -> torch.DataLoader:
         return None
+
+    def save(self) -> None:
+        pass
 

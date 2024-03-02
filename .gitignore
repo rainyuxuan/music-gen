@@ -160,5 +160,5 @@ cython_debug/
 .idea/
 
 # Data and Checkpoints
-data/
+./data/
 models/

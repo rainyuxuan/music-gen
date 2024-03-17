@@ -160,5 +160,12 @@ cython_debug/
 .idea/
 
 # Data and Checkpoints
-./data/
-models/
+#*.wav
+#*.csv
+#*.mid
+#*.zip
+#*.npz
+/data/**/*
+!/data/**/.gitkeep
+/models/
+!/models/.gitkeep

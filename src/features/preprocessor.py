@@ -4,6 +4,10 @@ from enum import Enum
 
 import numpy as np
 import torchaudio
+from torch.utils.data import DataLoader
+from torchaudio import transforms as T
+
+from src.data import WaveDataset
 
 
 class Wav2FreqConverter(Enum):
@@ -27,7 +31,7 @@ class WaveProcessor:
 
     def __init__(self, config):
         self.config = config
-        self.__converter = self._fft
+        self.__converter = self._mel_spectrogram
 
     def get_config(self) -> WaveProcessorConfig:
         return self.config
@@ -46,7 +50,9 @@ class WaveProcessor:
         """
         Convert waveform to mel spectrogram
         """
-        mel_spectrogram = torchaudio.transforms.MelSpectrogram(
+        # if waveform.ndim == 1:
+        #     waveform = waveform.reshape(1, -1)
+        mel_spectrogram = T.MelSpectrogram(
             sample_rate=sr,
             n_mels=self.config.n_mels,
             n_fft=self.config.n_fft,
@@ -60,7 +66,7 @@ class WaveProcessor:
         """
         Convert waveform to short time fourier transform
         """
-        swft = torchaudio.transforms.Spectrogram(
+        swft = T.Spectrogram(
             n_fft=self.config.n_fft,
             hop_length=self.config.hop_length,
             pad=self.config.pad,
@@ -83,7 +89,7 @@ class WaveProcessor:
         else:
             raise ValueError(f"Invalid wav2freq converter: {converter}")
 
-    def convert(self, waveform: np.ndarray, sr: int) -> np.ndarray:
+    def wav2freq(self, waveform: np.ndarray, sr: int) -> np.ndarray:
         """
         Convert waveform to frequency domain
         :param waveform: waveform data
@@ -97,4 +103,22 @@ class WaveProcessor:
         Denoise spectrogram
         :return: denoised spectrogram
         """
+        # TODO: Implement denoising
         return spectrogram[min_freq:max_freq, :]
+
+
+if __name__ == "__main__":
+    dataset = WaveDataset("data/raw/musicnet/musicnet/train_data", sr=100)
+    dl = DataLoader(dataset, batch_size=1, shuffle=False)
+    for i, (x, y, sr) in enumerate(dl):
+        print(x.shape, y.shape, sr)     # (samples, frames), (samples)
+        print(dataset.get_file_name(i))
+
+        config = WaveProcessorConfig()
+        wave_processor = WaveProcessor(config)
+
+        spectro = wave_processor.wav2freq(x[0], sr[0])
+        print(spectro.shape)
+        wave_processor.denoise(spectro)
+        print(spectro.shape)
+        break

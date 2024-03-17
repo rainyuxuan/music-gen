@@ -13,9 +13,9 @@ import os
 import soundfile as sf
 
 
-E = TypeVar('E')
-Waveform = np.ndarray[np.intp, E]
-Spectrogram = np.ndarray[(np.intp, np.intp), E]
+V = TypeVar('V')
+Waveform = np.ndarray[np.intp, np.float32]  # FIXME: should be np.ndarray[np.float32, V]?
+Spectrogram = np.ndarray[(np.intp, np.intp), np.float32]
 SpectroData = Tuple[Spectrogram, np.ndarray | None, DataFrame | None]
 
 
@@ -27,31 +27,34 @@ class WaveDataset(Dataset):
     __metadata_files: List[str] = []
     __data_dir: str = ""
     __split_ratio: float = 0.8
+    __sr: int = 44100
 
-    def __init__(self, data_dir: str, split_ratio: float = 0.8, transform=None):
+    def __init__(self, data_dir: str, split_ratio: float = 0.8, sr: int = 44100, transform=None):
         self.__data_dir = data_dir
         self.__files = os.listdir(data_dir)
         self.__split_ratio = split_ratio
         self.__transform = transform
+        self.__sr = sr
 
     def __len__(self) -> int:
         return len(self.__files)
 
     def __getitem__(self, idx: int) -> (Waveform, Waveform, int):
         """
-        Load wav file from wav file
+        Load wav file from wav file, split the file into x and y by split ratio
         :param idx: index of file to be loaded
         :return: (WaveformX, WaveformY, sampling rate)
         """
         data_path = os.path.join(self.__data_dir, self.__files[idx])
-        wav_data, sr = torchaudio.load(data_path, normalize=True) # wav_data: (n_channels, n_samples)
+        wav_data, sr = torchaudio.load(data_path, normalize=True)  # wav_data: (n_channels, n_samples)
+        wav_data = F.resample(wav_data, sr, self.__sr)  # TODO: can we merge this step with Transform?
         if self.__transform:
             wav_data = self.__transform(wav_data)
         # Split the file into x and y by split ratio
-        wav_data = wav_data[0]
+        wav_data = wav_data[0]  # Only use the first channel
         x = wav_data[:int(len(wav_data) * self.__split_ratio)]
         y = wav_data[int(len(wav_data) * self.__split_ratio):]
-        return x, y, sr
+        return x, y, self.__sr
 
     def get_file_name(self, idx: int) -> str:
         return self.__files[idx]

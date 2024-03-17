@@ -1,4 +1,6 @@
 """
 Download or generate data.
 """
-from loader import *
+
+from .dataset import *
+# from loader import *

@@ -9,14 +9,12 @@ import torchaudio.transforms as T
 from pandas import DataFrame
 from torch.utils.data import Dataset, DataLoader
 
-import librosa
-
 import os
 import soundfile as sf
 
 
 E = TypeVar('E')
-Waveform = np.ndarray[(np.intp, np.intp), E]
+Waveform = np.ndarray[np.intp, E]
 Spectrogram = np.ndarray[(np.intp, np.intp), E]
 SpectroData = Tuple[Spectrogram, np.ndarray | None, DataFrame | None]
 
@@ -30,29 +28,30 @@ class WaveDataset(Dataset):
     __data_dir: str = ""
     __split_ratio: float = 0.8
 
-    def __init__(self, data_dir: str, transform=None):
+    def __init__(self, data_dir: str, split_ratio: float = 0.8, transform=None):
         self.__data_dir = data_dir
         self.__files = os.listdir(data_dir)
+        self.__split_ratio = split_ratio
         self.__transform = transform
 
     def __len__(self) -> int:
         return len(self.__files)
 
-    def __getitem__(self, idx: int) -> (np.ndarray, int):
+    def __getitem__(self, idx: int) -> (Waveform, Waveform, int):
         """
-        Load wav file from wav file store the wav_data and sampling rate
+        Load wav file from wav file
         :param idx: index of file to be loaded
-        :return: (Waveform, sampling rate)
+        :return: (WaveformX, WaveformY, sampling rate)
         """
         data_path = os.path.join(self.__data_dir, self.__files[idx])
-        wav_data, sr = torchaudio.load(data_path, normalize=True)
+        wav_data, sr = torchaudio.load(data_path, normalize=True) # wav_data: (n_channels, n_samples)
         if self.__transform:
             wav_data = self.__transform(wav_data)
         # Split the file into x and y by split ratio
-        print(wav_data.shape, sr)
-        # x = wav_data[:, :int(len(wav_data) * self.__split_ratio)]
-        # y = wav_data[:, int(len(wav_data) * self.__split_ratio):]
-        return wav_data, sr
+        wav_data = wav_data[0]
+        x = wav_data[:int(len(wav_data) * self.__split_ratio)]
+        y = wav_data[int(len(wav_data) * self.__split_ratio):]
+        return x, y, sr
 
     def get_file_name(self, idx: int) -> str:
         return self.__files[idx]
@@ -69,8 +68,6 @@ class WaveDataset(Dataset):
         """
         destination_path = os.path.join(save_path, f"{file_name}.wav")
         sf.write(destination_path, wav_data, sr)
-
-
 
 
 class SpectrogramDataset(Dataset):
@@ -124,15 +121,19 @@ class SpectrogramDataset(Dataset):
         return spectro, label, metadata
 
     @staticmethod
-    def save(spectro_data: np.ndarray, save_path: str, file_name: str) -> None:
+    def save(spectro_data: np.ndarray, save_path: str, file_name: str, is_label: bool = False) -> None:
         """
         Save spectrogram to destination path with file name
         :param spectro_data: wav data in numpy form
         :param save_path: destination path
         :param file_name: name of file to be saved
+        :param is_label: whether the spectrogram is a label
         :return: None
         """
-        destination_path = os.path.join(save_path, f"{file_name}.npy")
+        if is_label:
+            destination_path = os.path.join(save_path, f"{file_name}.y.npy")
+        else:
+            destination_path = os.path.join(save_path, f"{file_name}.x.npy")
         np.save(destination_path, spectro_data)
 
 
@@ -151,8 +152,8 @@ class DataLoaders:
 
 
 if __name__ == "__main__":
-    dataset = WaveDataset("data/raw/musicnet/train_data")
+    dataset = WaveDataset("data/raw/musicnet/musicnet/train_data")
     dl = DataLoader(dataset, batch_size=1, shuffle=True)
-    for data, sr in dl:
-        print(data.shape, sr)
+    for x, y, sr in dl:
+        print(x.shape, y.shape, sr)
         break

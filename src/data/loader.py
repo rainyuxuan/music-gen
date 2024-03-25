@@ -34,7 +34,7 @@ class WaveLoader(DataLoader):
     def __init__(self):
         super().__init__()
 
-    def load(self,  data_path) -> (np.ndarray, int):
+    def load(self, data_path) -> (np.ndarray, int):
         """
         Load wav file from wav file store the wav_data and sampling rate
         :param data_path: path to load file
@@ -70,7 +70,7 @@ class SpectrogramLoader(DataLoader):
         fft = np.load(data_path)
         return fft
 
-    def save(self, fft: np.ndarray, save_path: str, file_name:str) -> None:
+    def save(self, fft: np.ndarray, save_path: str, file_name: str) -> None:
         """
         Save all fixed size segments in fourier format to save_path
         :param fft: numpy array of fft
@@ -81,4 +81,6 @@ class SpectrogramLoader(DataLoader):
         destination_path = os.path.join(save_path, f"{file_name}.npy")
         np.save(destination_path, fft)
         return None
+
+
 #

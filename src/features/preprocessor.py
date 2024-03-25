@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 from typing import Callable
+
+from custom_types import Spectrogram, Waveform
 from enum import Enum
 
 import numpy as np
@@ -7,70 +9,61 @@ import torchaudio
 from torch.utils.data import DataLoader
 from torchaudio import transforms as T
 
+from custom_types.preprocessor import WaveProcessorConfig
 from src.data import WaveDataset
 
 
 class Wav2FreqConverter(Enum):
-    fft = 'fft'
-    mel = 'mel'
-    stft = 'stft'
-
-
-@dataclass
-class WaveProcessorConfig:
-    n_mels: int = 128
-    n_fft: int = 2048
-    hop_length: int = 512
-    f_min: int = 0
-    f_max: int = 20000
-    pad: int = 0
+    fft = "fft"
+    mel = "mel"
+    stft = "stft"
 
 
 class WaveProcessor:
-    __converter: Callable[[np.ndarray, int], np.ndarray] = None
+    __config: WaveProcessorConfig = None
+    __converter: Callable[[Waveform], np.ndarray] = None
 
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, config: WaveProcessorConfig):
+        self.__config = config
         self.__converter = self._mel_spectrogram
 
     def get_config(self) -> WaveProcessorConfig:
-        return self.config
+        return self.__config
 
     def set_config(self, config: WaveProcessorConfig) -> None:
-        self.config = config
+        self.__config = config
 
-    def _fft(self, waveform: np.ndarray, sr: int) -> np.ndarray:
+    def _fft(self, waveform: Waveform) -> Spectrogram:
         """
         Convert waveform to Fast Fourier Transform
         """
         fft = np.fft.fft(waveform)
         return fft
 
-    def _mel_spectrogram(self, waveform: np.ndarray, sr: int) -> np.ndarray:
+    def _mel_spectrogram(self, waveform: Waveform) -> Spectrogram:
         """
         Convert waveform to mel spectrogram
         """
         # if waveform.ndim == 1:
         #     waveform = waveform.reshape(1, -1)
         mel_spectrogram = T.MelSpectrogram(
-            sample_rate=sr,
-            n_mels=self.config.n_mels,
-            n_fft=self.config.n_fft,
-            hop_length=self.config.hop_length,
-            f_min=self.config.f_min,
-            f_max=self.config.f_max
+            sample_rate=self.__config.sr,
+            n_mels=self.__config.n_mels,
+            n_fft=self.__config.n_fft,
+            hop_length=self.__config.hop_length,
+            f_min=self.__config.f_min,
+            f_max=self.__config.f_max,
         )(waveform)
         return mel_spectrogram
 
-    def _stft(self, waveform: np.ndarray, sr: int) -> np.ndarray:
+    def _stft(self, waveform: Waveform) -> Spectrogram:
         """
         Convert waveform to short time fourier transform
         """
         swft = T.Spectrogram(
-            n_fft=self.config.n_fft,
-            hop_length=self.config.hop_length,
-            pad=self.config.pad,
-            power=None
+            n_fft=self.__config.n_fft,
+            hop_length=self.__config.hop_length,
+            pad=self.__config.pad,
         )(waveform)
         return swft
 
@@ -89,16 +82,18 @@ class WaveProcessor:
         else:
             raise ValueError(f"Invalid wav2freq converter: {converter}")
 
-    def wav2freq(self, waveform: np.ndarray, sr: int) -> np.ndarray:
+    def wav2freq(self, waveform: Waveform) -> np.ndarray:
         """
         Convert waveform to frequency domain
         :param waveform: waveform data
         :param sr: sampling rate
         :return: frequency domain data: np.ndarray(freqs, time, intensity)
         """
-        return self.__converter(waveform, sr)
+        return self.__converter(waveform)
 
-    def denoise(self, spectrogram: np.ndarray, min_freq: int = 0, max_freq: int = 20000) -> np.ndarray:
+    def denoise(
+        self, spectrogram: Spectrogram, min_freq: int = 0, max_freq: int = 20000
+    ) -> Spectrogram:
         """
         Denoise spectrogram
         :return: denoised spectrogram
@@ -108,16 +103,17 @@ class WaveProcessor:
 
 
 if __name__ == "__main__":
-    dataset = WaveDataset("data/raw/musicnet/musicnet/train_data", sr=100)
-    dl = DataLoader(dataset, batch_size=1, shuffle=False)
-    for i, (x, y, sr) in enumerate(dl):
-        print(x.shape, y.shape, sr)     # (samples, frames), (samples)
+    sr = 100
+    dataset = WaveDataset("data/raw/musicnet/musicnet/train_data", sr=sr)
+    dl = DataLoader(dataset, batch_size=2, shuffle=False)
+    for i, (x, y, fname) in enumerate(dl):
+        print(fname, x.shape, y.shape, sr)  # (samples, frames), (samples)
         print(dataset.get_file_name(i))
 
-        config = WaveProcessorConfig()
+        config = WaveProcessorConfig(sr=sr)
         wave_processor = WaveProcessor(config)
 
-        spectro = wave_processor.wav2freq(x[0], sr[0])
+        spectro = wave_processor.wav2freq(x[0])
         print(spectro.shape)
         wave_processor.denoise(spectro)
         print(spectro.shape)

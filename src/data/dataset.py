@@ -91,8 +91,9 @@ class WaveDataset(Dataset):
         :param file_name: name of file to be saved
         :return: None
         """
+        wav_data = wav_data.unsqueeze(0)
         destination_path = os.path.join(save_path, f"{file_name}.wav")
-        sf.write(destination_path, wav_data, sr)
+        torchaudio.save(destination_path, wav_data, sr)
 
 
 class SpectrogramDataset(Dataset):

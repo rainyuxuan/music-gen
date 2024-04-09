@@ -8,6 +8,7 @@ import numpy as np
 import torchaudio
 from torch.utils.data import DataLoader
 from torchaudio import transforms as T
+from torchaudio import functional as F
 
 from custom_types.preprocessor import WaveProcessorConfig
 from src.data import WaveDataset
@@ -25,7 +26,7 @@ class WaveProcessor:
 
     def __init__(self, config: WaveProcessorConfig):
         self.__config = config
-        self.__converter = self._mel_spectrogram
+        self.__converter = self._stft
 
     def get_config(self) -> WaveProcessorConfig:
         return self.__config
@@ -64,6 +65,7 @@ class WaveProcessor:
             n_fft=self.__config.n_fft,
             hop_length=self.__config.hop_length,
             pad=self.__config.pad,
+            power=2.0,
         )(waveform)
         return swft
 
@@ -100,6 +102,16 @@ class WaveProcessor:
         """
         # TODO: Implement denoising
         return spectrogram[min_freq:max_freq, :]
+
+    def freq2wav(self, spectrogram: Spectrogram) -> Waveform:
+        """
+        Convert frequency domain to waveform
+        :param spectrogram: frequency domain data
+        :return: waveform data
+        """
+        return T.GriffinLim(n_fft=self.__config.n_fft, hop_length=self.__config.hop_length, power=2)(
+            spectrogram
+        )
 
 
 if __name__ == "__main__":

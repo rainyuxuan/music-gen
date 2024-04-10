@@ -1,4 +1,4 @@
-from custom_types import Dict, List
+from typing import Dict, List
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -114,10 +114,10 @@ class Trainer:
         device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"),
     ) -> pd.DataFrame:
 
-        model = self.model.to(device)  # move model to GPU if applicable
+        self.model = self.model.to(device)  # move model to GPU if applicable
         criterion = nn.MSELoss()
         optimizer = optim.Adam(
-            model.parameters(), lr=learning_rate, weight_decay=weight_decay
+            self.model.parameters(), lr=learning_rate, weight_decay=weight_decay
         )
         history = []
 
@@ -128,9 +128,9 @@ class Trainer:
             train_acc = 0
             val_acc = 0
 
-            model.train()
+            self.model.train()
 
-            for data, target in self.dataloaders["train"]:
+            for data, target, fname in self.dataloaders["train"]:
 
                 if torch.cuda.is_available():
                     data, target = data.cuda(), target.cuda()
@@ -138,7 +138,7 @@ class Trainer:
                 # Clear gradients
                 optimizer.zero_grad()
                 # Predicted outputs
-                output = model(data)
+                output = self.model(data)
 
                 # Loss and backpropagation of gradients
                 loss = criterion(output, target)
@@ -158,15 +158,15 @@ class Trainer:
             # Don't need to keep track of gradients
             with torch.no_grad():
                 # Set to evaluation mode
-                model.eval()
+                self.model.eval()
 
                 # Validation loop
-                for data, target in self.dataloaders["val"]:
+                for data, target, fname in self.dataloaders["val"]:
                     # Tensors to gpu
                     data, target = data.cuda(), target.cuda()
 
                     # Forward pass
-                    output = model(data)
+                    output = self.model(data)
 
                     # Validation loss
                     loss = criterion(output, target)

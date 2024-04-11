@@ -8,6 +8,7 @@ import torchaudio
 import torchaudio.functional as F
 import torchaudio.transforms as T
 from pandas import DataFrame
+from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
 
 import os
@@ -28,12 +29,12 @@ class WaveDataset(Dataset):
     __max_sec: int = 60
 
     def __init__(
-        self,
-        data_dir: str,
-        split_ratio: float = 0.8,
-        sr: int = 44100,
-        max_sec: int = 60,
-        transform=None,
+            self,
+            data_dir: str,
+            split_ratio: float = 0.8,
+            sr: int = 44100,
+            max_sec: int = 60,
+            transform=None,
     ):
         self.__data_dir = data_dir
         self.__files = os.listdir(data_dir)
@@ -65,7 +66,7 @@ class WaveDataset(Dataset):
         # Split the file into x and y by split ratio
         wav_data = wav_data[0]  # Only use the first channel
         x = wav_data[: int(len(wav_data) * self.__split_ratio)]
-        y = wav_data[int(len(wav_data) * self.__split_ratio) :]
+        y = wav_data[int(len(wav_data) * self.__split_ratio):]
         fname = self.__files[idx]
         return x, y, fname
 
@@ -95,6 +96,17 @@ class WaveDataset(Dataset):
         destination_path = os.path.join(save_path, f"{file_name}.wav")
         torchaudio.save(destination_path, wav_data, sr)
 
+    @staticmethod
+    def collate_fn(batch: List[Waveform]) -> Waveform:
+        tensors, targets, names = [], [], []
+        for x, y, name in batch:
+            tensors.append(x)
+            targets.append(y)
+            names.append(name)
+        tensors = pad_sequence(tensors, batch_first=True)
+        targets = pad_sequence(targets, batch_first=True)
+        return tensors, targets, names
+
 
 class SpectrogramDataset(Dataset):
     """
@@ -110,11 +122,11 @@ class SpectrogramDataset(Dataset):
     __sr: int = 0
 
     def __init__(
-        self,
-        data_dir: str,
-        transform=None,
-        label_dir: str = None,
-        metadata_dir: str = None,
+            self,
+            data_dir: str,
+            transform=None,
+            label_dir: str = None,
+            metadata_dir: str = None,
     ):
         self.__data_dir = data_dir
         self.__label_dir = label_dir
@@ -164,10 +176,10 @@ class SpectrogramDataset(Dataset):
 
     @staticmethod
     def save(
-        spectro_data: Spectrogram,
-        save_path: str,
-        file_name: str,
-        is_label: bool = False,
+            spectro_data: Spectrogram,
+            save_path: str,
+            file_name: str,
+            is_label: bool = False,
     ) -> None:
         """
         Save spectrogram to destination path with file name
@@ -197,6 +209,18 @@ class SpectrogramDataset(Dataset):
             writer = csv.writer(csv_file)
             for key, value in metadata.items():
                 writer.writerow([key, value])
+
+    @staticmethod
+    def collate_fn(batch: List[SpectroData]) -> SpectroData:
+        tensors, labels, names = [], [], []
+        for x, y, name in batch:
+            tensors.append(x)
+            labels.append(y)
+            names.append(name)
+        tensors = pad_sequence(tensors, batch_first=True)
+        labels = torch.stack(labels)
+        names = torch.stack(names)
+        return tensors, labels, names
 
 
 def __test_wave_dataset():

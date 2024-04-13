@@ -6,7 +6,6 @@ from torch import nn, Tensor
 from torch.nn import TransformerEncoder, TransformerEncoderLayer, TransformerDecoderLayer, TransformerDecoder
 
 from custom_types import Spectrogram
-from models import device
 
 
 @dataclass
@@ -30,7 +29,8 @@ class BaseTransformer(nn.Module):
         self.d_model = nfreqs
 
         # Embedding layer for the frequency bins
-        self.src_tok_emb = nn.Linear(nfreqs, nfreqs)
+        self.embedding = nn.Linear(nfreqs, nfreqs)
+        nn.Conv2d(1, 1, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
         # self.tgt_tok_emb = nn.Linear(nfreqs, nfreqs)
 
         # Positional encoding is important for maintaining the order of time frames
@@ -41,22 +41,23 @@ class BaseTransformer(nn.Module):
         # Output layer
         self.output = nn.Linear(nfreqs, nfreqs)
 
-    def forward(self, src: Spectrogram, tgt: Spectrogram = None) -> Spectrogram:
-        src = self.src_tok_emb(src)  # Embed source spectrogram
-
+    def forward(self, src: Spectrogram, tgt: Spectrogram) -> Spectrogram:
+        src = self.embedding(src)
         src = self.positional_encoding(src)
-
-        output = self.transformer(src)
+        tgt = self.embedding(tgt)
+        tgt = self.positional_encoding(tgt)
+        output = self.transformer(src, tgt)
         output = self.output(output)
         return output
 
     @torch.no_grad()
-    def generate(self, src: Tensor, nframes: int) -> Tensor:
+    def generate(self, src: Tensor, nframes: int,
+                 device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")) -> Tensor:
         """Generate a sequence of frames from the input spectrogram"""
         result = torch.empty((src.shape[0], src.shape[1], nframes), device=device, dtype=src.dtype)
 
         for i in range(nframes):
-            output = self.forward(src)
+            output = self.forward(src, src)
             result[:, :, i] = output[:, :, -1]
             src = torch.cat((src, output), dim=2)
 
@@ -66,7 +67,7 @@ class BaseTransformer(nn.Module):
 class ModularizedTransformer(BaseTransformer):
     nhead: int
 
-    def __init__(self, nfreqs: int, nhead: int, num_encoder_layers: int, num_decoder_layers: int, dim_feedforward=2048,
+    def __init__(self, nfreqs: int, nhead: int=8, num_encoder_layers: int=6, num_decoder_layers: int=6, dim_feedforward=2048,
                  dropout=0.1):
         super(ModularizedTransformer, self).__init__(nfreqs)
 
@@ -99,7 +100,7 @@ class ModularizedTransformer(BaseTransformer):
             """Generate a square causal mask for the sequence. The masked positions are filled with float('-inf').
             Unmasked positions are filled with float(0.0).
             """
-            src_mask = nn.Transformer.generate_square_subsequent_mask(len(src)).to(device)
+            src_mask = nn.Transformer.generate_square_subsequent_mask(len(src))
         code = self.transformer_encoder(src, src_mask)
         output = self.transformer_decoder(code)
         # output = self.linear(output)

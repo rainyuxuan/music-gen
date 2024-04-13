@@ -8,6 +8,7 @@ import torchaudio
 import torchaudio.functional as F
 import torchaudio.transforms as T
 from pandas import DataFrame
+from torch import Tensor
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
 
@@ -24,21 +25,21 @@ class WaveDataset(Dataset):
     __files: List[str] = []
     __metadata_files: List[str] = []
     __data_dir: str = ""
-    __split_ratio: float = 0.8
+    # __split_ratio: float = 0.8
     __sr: int = 44100
     __max_sec: int = 60
 
     def __init__(
             self,
             data_dir: str,
-            split_ratio: float = 0.8,
+            # split_ratio: float = 0.8,
             sr: int = 44100,
             max_sec: int = 60,
             transform=None,
     ):
         self.__data_dir = data_dir
         self.__files = os.listdir(data_dir)
-        self.__split_ratio = split_ratio
+        # self.__split_ratio = split_ratio
         self.__transform = transform
         self.__sr = sr
         self.__max_sec = max_sec
@@ -65,10 +66,10 @@ class WaveDataset(Dataset):
             wav_data = self.__transform(wav_data)
         # Split the file into x and y by split ratio
         wav_data = wav_data[0]  # Only use the first channel
-        x = wav_data[: int(len(wav_data) * self.__split_ratio)]
-        y = wav_data[int(len(wav_data) * self.__split_ratio):]
-        fname = self.__files[idx]
-        return x, y, fname
+        # x = wav_data[: int(len(wav_data) * self.__split_ratio)]
+        # y = wav_data[int(len(wav_data) * self.__split_ratio):]
+        fname = self.__files[idx].replace(".wav", "")
+        return wav_data, fname
 
     def get_file_name(self, idx: int) -> str:
         return self.__files[idx]
@@ -98,14 +99,12 @@ class WaveDataset(Dataset):
 
     @staticmethod
     def collate_fn(batch: List[Waveform]) -> Waveform:
-        tensors, targets, names = [], [], []
-        for x, y, name in batch:
+        tensors, names = [], []
+        for x, name in batch:
             tensors.append(x)
-            targets.append(y)
             names.append(name)
         tensors = pad_sequence(tensors, batch_first=True)
-        targets = pad_sequence(targets, batch_first=True)
-        return tensors, targets, names
+        return tensors, names
 
 
 class SpectrogramDataset(Dataset):
@@ -114,29 +113,25 @@ class SpectrogramDataset(Dataset):
     """
 
     __files: List[str] = []
-    __label_files: List[str] = []
     __metadata_files: List[str] = []
     __data_dir: str = ""
     __label_dir: str = ""
     __metadata_dir: str = ""
     __sr: int = 0
+    __split_ratio: float = 0.8
 
     def __init__(
             self,
             data_dir: str,
             transform=None,
-            label_dir: str = None,
             metadata_dir: str = None,
+            split_ratio: float = 0.8,
     ):
         self.__data_dir = data_dir
-        self.__label_dir = label_dir
         self.__metadata_dir = metadata_dir
+        self.__split_ratio = split_ratio
 
         self.__files = [f for f in os.listdir(data_dir) if f.endswith(".npy")]
-        if label_dir:
-            self.__label_files = [
-                f for f in os.listdir(label_dir) if f.endswith(".npy")
-            ]
         if metadata_dir:
             self.__metadata_files = [
                 f for f in os.listdir(metadata_dir) if f.endswith(".csv")
@@ -156,16 +151,13 @@ class SpectrogramDataset(Dataset):
         spectro: Spectrogram = torch.tensor(np.load(data_path, mmap_mode="r"))
         if self.__transform:
             spectro = self.__transform(spectro)
-
-        if len(self.__label_files) > 0:
-            label_path = os.path.join(self.__label_dir, self.__label_files[idx])
-            label: Spectrogram | None = torch.tensor(np.load(label_path, mmap_mode="r"))
-            if self.__transform:
-                label = self.__transform(label)
+        # Split the file into x and y by split ratio
+        if self.__split_ratio < 1.0:
+            spectro, remain = spectro[:, : int(spectro.shape[1] * self.__split_ratio)], spectro[:, int(spectro.shape[1] * self.__split_ratio):]
         else:
-            label = []
+            remain = []
 
-        return spectro, label, self.__files[idx]
+        return spectro, remain, self.__files[idx].replace(".npy", "")
 
     def get_metadata(self, idx: int) -> Dict:
         metadata_path = os.path.join(self.__metadata_dir, self.__metadata_files[idx])
@@ -178,8 +170,7 @@ class SpectrogramDataset(Dataset):
     def save(
             spectro_data: Spectrogram,
             save_path: str,
-            file_name: str,
-            is_label: bool = False,
+            file_name: str
     ) -> None:
         """
         Save spectrogram to destination path with file name
@@ -189,10 +180,7 @@ class SpectrogramDataset(Dataset):
         :param is_label: whether the spectrogram is a label
         :return: None
         """
-        if is_label:
-            destination_path = os.path.join(save_path, f"{file_name}.y.npy")
-        else:
-            destination_path = os.path.join(save_path, f"{file_name}.x.npy")
+        destination_path = os.path.join(save_path, f"{file_name}.npy")
         np.save(destination_path, spectro_data)
 
     @staticmethod
@@ -234,8 +222,7 @@ def __test_wave_dataset():
 
 def __test_spectrogram_dataset():
     dataset = SpectrogramDataset(
-        "data/processed/musicnet/train_data",
-        label_dir="data/processed/musicnet/train_labels",
+        "data/processed/musicnet/train_data"
     )
     dl = DataLoader(dataset, batch_size=2, shuffle=False)
     for xs, ys, fnames in dl:

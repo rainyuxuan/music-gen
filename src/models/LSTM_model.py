@@ -10,11 +10,12 @@ from features import *
 from models.trainer import *
 from data.dataset import SpectrogramDataset
 from torch.utils.data import random_split
+from tqdm import tqdm
 
 @dataclass
 class LSTMConfig:
-    input_size: int = 993
-    hidden_size: int = 512
+    emb_size: int = 100
+    hidden_size: int = 10
     output_size: int = 249
     token_size: int = 201
     dropout: float = 0.2
@@ -35,7 +36,7 @@ class MyLSTM(nn.Module):
         : param batch_size: number of samples in a batch
         """
         super(MyLSTM, self).__init__()
-        self.input_size = config.input_size
+        self.emb_size = config.emb_size
         self.hidden_size = config.hidden_size
         self.output_size = config.output_size
         self.token_size = config.token_size
@@ -45,23 +46,25 @@ class MyLSTM(nn.Module):
         # Call init_hidden to initialize for safety reasons
         self.hidden = None
 
-        self.fc1 = nn.Linear(self.input_size, self.hidden_size, bias=self.bias)
+        self.fc1 = nn.Linear(self.token_size, self.emb_size, bias=self.bias)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(self.dropout)
-        self.lstm = nn.LSTM(1, self.hidden_size, batch_first=True)
+        self.lstm = nn.LSTM(self.emb_size, self.hidden_size, batch_first=True)
         self.fc2 = nn.Linear(self.hidden_size, self.token_size, bias=self.bias)
 
     def forward(self, x):
+        x = torch.transpose(x, -1, -2)
+        self.init_hidden(x)
         x = self.fc1(x)
         x = self.relu(x)
         x = self.dropout(x)
-        out, self.hidden = self.lstm(x.view(len(x), -1, 1), self.hidden)
+        out, self.hidden = self.lstm(x, self.hidden)
         logits = self.fc2(out[:, -1, :])
         return logits
 
-    def init_hidden(self, device):
-        self.hidden = (torch.zeros(1, self.batch_size, self.hidden_size).to(device),
-                       torch.zeros(1, self.batch_size, self.hidden_size).to(device))
+    def init_hidden(self, input: torch.Tensor):
+        self.hidden = (torch.zeros(1, input.shape[0], self.hidden_size).to(input.device),
+                       torch.zeros(1, input.shape[0], self.hidden_size).to(input.device))
         
     def generate(self, input: torch.Tensor):
         device = input.device
@@ -77,14 +80,14 @@ class MyLSTM(nn.Module):
 
 class LSTMTrainer(Trainer):
     def create_model(self, 
-                     input_size: int = 993,
-                     hidden_size: int = 1024,
+                     emb_size: int = 100,
+                     hidden_size: int = 10,
                      output_size: int = 249,
                      token_size: int = 201,
                      dropout: float = 0.2,
                      batch_size: int = 2,
                      bias: bool = True) -> None:
-        config = LSTMConfig(input_size, 
+        config = LSTMConfig(emb_size, 
                             hidden_size, 
                             output_size,
                             token_size,
@@ -131,7 +134,6 @@ class LSTMTrainer(Trainer):
                 output = torch.empty((target.shape[0], target.shape[1], target.shape[2]), device=device)
                 batch_loss = 0.0
                 for i in range(target.shape[-1]):
-                    model.init_hidden(device)
                     # Predicted outputs
                     cur_output = self.model(data)
 
@@ -147,7 +149,7 @@ class LSTMTrainer(Trainer):
                 optimizer.step()
 
                 # Track train loss by multiplying average loss by number of examples in batch
-                train_loss += loss.item() * data.size(0)
+                train_loss += batch_loss * data.size(0)
                 # check target have same shape as output
                 target = target.data.view_as(output)
                 accuracy = self.get_accuracy(output, target)

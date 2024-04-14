@@ -4,6 +4,7 @@ from torch import nn, Tensor
 from data.dataset import *
 from features.preprocessor import *
 from models.trainer import *
+from tqdm import tqdm
 
 # n = 25
 
@@ -26,6 +27,9 @@ class AST_trainer(Trainer):
     def __init__(self):
         super(AST_trainer, self).__init__()
 
+    def create_model(self, config) -> None:
+        self.model =  AST(config)
+
     def train(
             self,
             weight_decay: float,
@@ -33,10 +37,10 @@ class AST_trainer(Trainer):
             num_epochs: int,
             device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"),
     ) -> pd.DataFrame:
-        model = self.model.to(device)  # move model to GPU if applicable
+        self.model = self.model.to(device)  # move model to GPU if applicable
         criterion = nn.MSELoss()
         optimizer = optim.Adam(
-            model.parameters(), lr=learning_rate, weight_decay=weight_decay
+            self.model.parameters(), lr=learning_rate, weight_decay=weight_decay
         )
         history = []
 
@@ -47,8 +51,11 @@ class AST_trainer(Trainer):
             train_acc = 0
             val_acc = 0
 
-            model.train()
-            for data, target, _ in self.dataloaders["train"]:
+            self.model.train()
+
+            train_data = self.dataloaders["train"]
+            train_bar = tqdm(train_data, total=len(train_data), desc=f'Train epoch {e}')
+            for data, target, _ in train_bar:
 
                 # i = data.shape[2]
                 # data = data[:, :, i-n:]
@@ -77,10 +84,12 @@ class AST_trainer(Trainer):
             # Don't need to keep track of gradients
             with torch.no_grad():
                 # Set to evaluation mode
-                model.eval()
+                self.model.eval()
 
                 # Validation loop
-                for data, target, _ in self.dataloaders["val"]:
+                val_data = self.dataloaders["val"]
+                val_bar = tqdm(val_data, total=len(val_data), desc=f'Validation epoch {e}')
+                for data, target, _ in val_bar:
                     # Tensors to gpu
                     # i = data.shape[2]
                     # data = data[:, :, i - n:]

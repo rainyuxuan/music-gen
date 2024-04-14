@@ -104,10 +104,10 @@ class LSTMTrainer(Trainer):
         device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"),
     ) -> pd.DataFrame:
 
-        model = self.model.to(device)  # move model to GPU if applicable
+        self.model = self.model.to(device)  # move model to GPU if applicable
         criterion = nn.MSELoss()
         optimizer = optim.Adam(
-            model.parameters(), lr=learning_rate, weight_decay=weight_decay
+            self.model.parameters(), lr=learning_rate, weight_decay=weight_decay
         )
         history = []
 
@@ -118,10 +118,10 @@ class LSTMTrainer(Trainer):
             train_acc = 0
             val_acc = 0
 
-            model.train()
+            self.model.train()
 
             train_data = self.dataloaders["train"]
-            train_bar = tqdm(train_data, total=len(train_data), desc=f'Train epoch {e+1}')
+            train_bar = tqdm(train_data, total=len(train_data), desc=f'Train epoch {e}')
             for data, target, _ in train_bar:
 
                 if torch.cuda.is_available():
@@ -159,18 +159,18 @@ class LSTMTrainer(Trainer):
             # Don't need to keep track of gradients
             with torch.no_grad():
                 # Set to evaluation mode
-                model.eval()
+                self.model.eval()
 
                 # Validation loop
                 val_data = self.dataloaders["val"]
-                val_bar = tqdm(val_data, total=len(val_data), desc=f'Validation epoch {e+1}')
+                val_bar = tqdm(val_data, total=len(val_data), desc=f'Validation epoch {e}')
                 for data, target, _ in val_bar:
                     # Tensors to gpu
                     if torch.cuda.is_available():
                         data, target = data.cuda(), target.cuda()
 
                     # Forward pass
-                    output = model.generate(data)
+                    output = self.model.generate(data)
 
                     # Validation loss
                     loss = criterion(output, target)

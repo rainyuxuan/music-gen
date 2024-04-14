@@ -4,6 +4,7 @@ import torch.optim as optim
 import pandas as pd
 import math
 from models.trainer import Trainer
+from tqdm import tqdm
 
 def conv_size(org_size: int, kernel_size: int, stride: int, padding: int) -> int:
     return int(math.floor((org_size + 2.0 * padding - kernel_size) / stride) + 1)
@@ -36,7 +37,9 @@ class CNNTrainer(Trainer):
 
             self.model.train()
 
-            for data, target, fname in self.dataloaders["train"]:
+            train_data = self.dataloaders["train"]
+            train_bar = tqdm(train_data, total=len(train_data), desc=f'Train epoch {e}')
+            for data, target, _ in train_bar:
 
                 if torch.cuda.is_available():
                     data, target = data.cuda(), target.cuda()

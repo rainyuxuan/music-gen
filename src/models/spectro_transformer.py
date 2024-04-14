@@ -9,7 +9,7 @@ from tqdm import tqdm
 # n = 25
 
 class AST(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, ):
         super(AST, self).__init__()
         self.config = config
         self.output_layer = nn.Linear(in_features=config.hidden_size, out_features=config.num_mel_bins)
@@ -22,6 +22,18 @@ class AST(nn.Module):
         x = x.pooler_output
         x = self.output_layer(x)
         return x
+
+    def generate(self, x, out_size):
+        device = x.device
+        out = torch.empty((x.shape[0], x.shape[1], out_size), device=device)
+
+        for i in range(out_size):
+            cur_token = self.forward(x)
+            out[:, :, i] = cur_token
+            x = torch.cat((x[:, :, 1:], torch.unsqueeze(cur_token, dim= -1)), dim=-1)
+            
+
+        return out
 
 class AST_trainer(Trainer):
     def __init__(self):

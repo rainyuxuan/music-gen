@@ -66,11 +66,15 @@ class MyLSTM(nn.Module):
         self.hidden = (torch.zeros(1, input.shape[0], self.hidden_size).to(input.device),
                        torch.zeros(1, input.shape[0], self.hidden_size).to(input.device))
         
-    def generate(self, input: torch.Tensor):
+    def generate(self, input: torch.Tensor, output_size=None):
         device = input.device
-        out = torch.empty((input.shape[0], self.token_size, self.output_size), device=device)
 
-        for i in range(self.output_size):
+        if output_size == None:
+            output_size = self.output_size
+
+        out = torch.empty((input.shape[0], input.shape[1], output_size), device=device)
+
+        for i in range(output_size):
             cur_token = self.forward(input)
             out[:, :, i] = cur_token
             input = torch.cat((input[:, :, 1:], torch.unsqueeze(cur_token, dim= -1)), dim=-1)

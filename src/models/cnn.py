@@ -176,11 +176,15 @@ class CNN(nn.Module):
 
         return cur_token
     
-    def generate(self, x):
+    def generate(self, x, output_size = None):
         device = x.device
-        out = torch.empty((x.shape[0], self.token_size, self.out_size), device=device)
 
-        for i in range(self.out_size):
+        if output_size == None:
+            output_size = self.out_size
+
+        out = torch.empty((x.shape[0], x.shape[1], output_size), device=device)
+
+        for i in range(output_size):
             cur_token = self.forward(x)
             out[:, :, i] = cur_token
             x = torch.cat((x[:, :, 1:], torch.unsqueeze(cur_token, dim= -1)), dim=-1)

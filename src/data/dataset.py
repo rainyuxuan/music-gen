@@ -47,7 +47,7 @@ class WaveDataset(Dataset):
     def __len__(self) -> int:
         return len(self.__files)
 
-    def __getitem__(self, idx: int) -> (Waveform, Waveform, str):
+    def __getitem__(self, idx: int) -> (Waveform, str):
         """
         Load wav file from wav file, split the file into x and y by split ratio
         :param idx: index of file to be loaded

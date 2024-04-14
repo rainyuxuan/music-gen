@@ -11,7 +11,7 @@ from torchaudio import transforms as T
 from torchaudio import functional as F
 
 from custom_types.preprocessor import WaveProcessorConfig
-from src.data import WaveDataset
+from data import WaveDataset
 
 
 class Wav2FreqConverter(Enum):

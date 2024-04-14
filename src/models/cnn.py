@@ -3,8 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import pandas as pd
 import math
-from tqdm import tqdm
-from src.models.trainer import Trainer
+from models.trainer import Trainer
 
 def conv_size(org_size: int, kernel_size: int, stride: int, padding: int) -> int:
     return int(math.floor((org_size + 2.0 * padding - kernel_size) / stride) + 1)

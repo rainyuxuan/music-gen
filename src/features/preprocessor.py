@@ -109,6 +109,8 @@ class WaveProcessor:
         :param spectrogram: frequency domain data
         :return: waveform data
         """
+        if self.__converter == self._mel_spectrogram:
+            spectrogram = T.InverseMelScale(n_stft=self.__config.n_fft)(spectrogram)
         return T.GriffinLim(n_fft=self.__config.n_fft, hop_length=self.__config.hop_length, power=2)(
             spectrogram
         )

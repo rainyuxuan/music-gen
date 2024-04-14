@@ -1,3 +1,6 @@
+# This program is used to process wav files into spectrogram
+# and save it locally for better performance
+
 import os
 import sys
 

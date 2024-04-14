@@ -17,6 +17,7 @@ torch = "^2.2.0"
 torchaudio = "^2.2.1"
 # Data preprocessing
 librosa = "^0.10.1"
+transformers = "^4.39.3"
 
 [tool.poetry.dev-dependencies]
 black = {extras = ["jupyter"], version = "^24.2.0"}
